@@ -6,3 +6,4 @@ node_modules
 server/pb_data
 server/pb_migrations/
 __pycache__
+pocketbase.exe

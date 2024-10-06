@@ -40,11 +40,13 @@ export enum QueuesStatusOptions {
 	"done" = "done",
 }
 export type QueuesRecord = {
-	gid: string
+	fire?: number
+	health?: number
 	lat?: number
 	long?: number
 	status?: QueuesStatusOptions
 	user?: RecordIdString
+	water?: number
 }
 
 export type UsersRecord = {

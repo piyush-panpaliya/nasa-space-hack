@@ -4,8 +4,9 @@ import requests
 from datetime import datetime, timezone, timedelta
 import math
 from getNDVI import mainNVDI
-from req import createQueue, update
+from req import createQueue, update, makeLLM
 import threading
+import concurrent.futures
 
 
 def calculate_extra_energy(E0, d):
@@ -177,6 +178,16 @@ def getWeather(lat, lng):
   return T_min, T_max, elevation, temperature, dew_point, windspeed, P, precipitation
 
 
+def run_in_parallel(lat, lng, today):
+  with concurrent.futures.ThreadPoolExecutor() as executor:
+    future_ndvi = executor.submit(getNDVI, lat, lng, today)
+    future_fire = executor.submit(getFire, lat, lng, today)
+
+    ndvi_result = future_ndvi.result()
+    fire_result = future_fire.result()
+  return ndvi_result, fire_result
+
+
 def ok(lat, lng):
   india_timezone = timezone(timedelta(hours=5, minutes=30))
   today = datetime.now(india_timezone)
@@ -188,8 +199,7 @@ def ok(lat, lng):
   E0 = 1367
   T_min, T_max, elevation, temperature, dew_point, windspeed, P, precipitation = getWeather(
     lat, lng)
-  NDVI = getNDVI(lat, lng, today)
-  FIRE = getFire(lat, lng, today)
+  NDVI, FIRE = run_in_parallel(lat, lng, today)
 
   E_extra = calculate_extra_energy(E0, d)
   E_extra_mj = convert_watt_to_mj(E_extra)
@@ -229,11 +239,13 @@ app = Flask(__name__)
 
 def background_task(lat, lng, res):
   water_needed_liters, NDVI, FIRE = ok(lat, lng)
+  resLLM = makeLLM(water_needed_liters, FIRE, NDVI, lat, lng)
   update(res['id'], {
       'fire': FIRE,
       'health': NDVI,
       'water': water_needed_liters,
-      'status': 'done'
+      'status': 'done',
+      'llm': resLLM['response']
   })
 
 
@@ -250,4 +262,4 @@ def calculate():
 
 
 if __name__ == '__main__':
-  app.run(debug=True)
+  app.run(debug=False)
