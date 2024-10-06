@@ -7,6 +7,9 @@ from getNDVI import mainNVDI
 from req import createQueue, update, makeLLM
 import threading
 import concurrent.futures
+from biomassEst.src.getData import getBioMass
+from trainSoilNutrients.getData import getSoil
+import json
 
 
 def calculate_extra_energy(E0, d):
@@ -169,6 +172,12 @@ def getWeather1(lat, lng):
   return dayF['maxtemp_c'], dayF['mintemp_c'], dayF['maxtemp_c'], f['hour'][0]['dewpoint_c']
 
 
+def getSoilInfo(lat, lng):
+  biomass = getBioMass(lat, lng)
+  soil = getSoil(lat, lng)
+  return biomass, soil
+
+
 def getWeather(lat, lng):
   T_max, T_min, temperature, dew_point = getWeather1(lat, lng)
   elevation, windspeed, precipitation = getWeather2(lat, lng)
@@ -182,10 +191,10 @@ def run_in_parallel(lat, lng, today):
   with concurrent.futures.ThreadPoolExecutor() as executor:
     future_ndvi = executor.submit(getNDVI, lat, lng, today)
     future_fire = executor.submit(getFire, lat, lng, today)
-
+    biomass, soil = getSoilInfo(lat, lng)
     ndvi_result = future_ndvi.result()
     fire_result = future_fire.result()
-  return ndvi_result, fire_result
+  return ndvi_result, fire_result, biomass, soil
 
 
 def ok(lat, lng):
@@ -199,7 +208,7 @@ def ok(lat, lng):
   E0 = 1367
   T_min, T_max, elevation, temperature, dew_point, windspeed, P, precipitation = getWeather(
     lat, lng)
-  NDVI, FIRE = run_in_parallel(lat, lng, today)
+  NDVI, FIRE, biomass, soil = run_in_parallel(lat, lng, today)
 
   E_extra = calculate_extra_energy(E0, d)
   E_extra_mj = convert_watt_to_mj(E_extra)
@@ -231,21 +240,23 @@ def ok(lat, lng):
   water_needed_liters = calculate_water_to_spray(
       ETc, field_area, irrigation_efficiency, precipitation)
 
-  return water_needed_liters, NDVI, FIRE
+  return water_needed_liters, NDVI, FIRE, biomass, soil
 
 
 app = Flask(__name__)
 
 
 def background_task(lat, lng, res):
-  water_needed_liters, NDVI, FIRE = ok(lat, lng)
+  water_needed_liters, NDVI, FIRE, biomass, soil = ok(lat, lng)
   resLLM = makeLLM(water_needed_liters, FIRE, NDVI, lat, lng)
   update(res['id'], {
       'fire': FIRE,
       'health': NDVI,
       'water': water_needed_liters,
       'status': 'done',
-      'llm': resLLM['response']
+      'llm': resLLM['response'],
+      'biomass': biomass,
+      'soil': json.dumps(soil)
   })
 
 

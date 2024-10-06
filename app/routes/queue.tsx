@@ -139,8 +139,29 @@ const Home = () => {
                             }}
                           ></div>
                         </div>
-                        <p className='text-sm'>health is {queue.health}</p>
+                        <p className='text-sm'>
+                          soild health is {queue.health}
+                        </p>
                       </div>
+                      {!!queue.biomass && (
+                        <p>
+                          {' '}
+                          <span className='font-semibold'>Biomass: </span>
+                          {queue.biomass}
+                        </p>
+                      )}
+                      {!!queue.soil && (
+                        <p>
+                          {' '}
+                          <span className='font-semibold'>Soil Nutrients:</span>
+                          {Object.entries(queue.soil).map(([key, value]) => (
+                            <p key={key}>
+                              <span className='font-medium'>{key}: </span>
+                              {value}
+                            </p>
+                          ))}
+                        </p>
+                      )}
                       <p className='font-semibold'>suggestions:</p>
                       <p>{queue.llm}</p>
                     </div>
